@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Starter Boilerplate",
+  "description": "A clean, minimalistic React boilerplate for building Gemini AI applications. Features a simple chat interface to demonstrate API connectivity and response handling.",
+  "requestFramePermissions": []
+}
