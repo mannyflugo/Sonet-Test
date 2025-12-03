@@ -15,7 +15,7 @@ export const Header: React.FC<HeaderProps> = ({ onClear, messageCount }) => {
           </svg>
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Gemini Boilerplate</h1>
+          <h1 className="text-xl font-bold text-gray-800">EE and Sonet NodeJS practice</h1>
           <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Powered by Google GenAI</p>
         </div>
       </div>
