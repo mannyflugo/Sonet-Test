@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import React, { useState } from 'react';
 import { MessageList } from './components/MessageList';
 import { InputArea } from './components/InputArea';
 import { Header } from './components/Header';
@@ -10,47 +9,56 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize Gemini API client
-  // CRITICAL: We create a new instance only when needed or memoize if strictly necessary, 
-  // but for simple text generation, instantiating here is safe as long as we use the key correctly.
-  // Using a ref to hold the client is a good pattern if we had stateful chat sessions.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
 
-    // 1. Add user message to state
+    // 1. Add user message to UI immediately
     const userMessage: ChatMessage = {
       role: 'user',
       text: text,
       timestamp: Date.now(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+    
+    // Optimistically update UI
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    
     setIsLoading(true);
     setError(null);
 
     try {
-      // 2. Call Gemini API
-      // Using gemini-2.5-flash for speed and efficiency as per guidelines for basic text tasks
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: text, 
+      // 2. Call our local Node.js server instead of Google directly
+      const response = await fetch('http://localhost:3000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          history: messages, // Send previous context
+          message: text      // Send current text
+        }),
       });
 
-      // 3. Extract text and add model message to state
-      const responseText = response.text; // Access .text property directly
-      
-      const modelMessage: ChatMessage = {
-        role: 'model',
-        text: responseText || "No response generated.",
-        timestamp: Date.now(),
-      };
+      if (!response.ok) {
+        throw new Error(`Server Error: ${response.statusText}`);
+      }
 
-      setMessages((prev) => [...prev, modelMessage]);
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // 3. Add Model Response to UI
+      setMessages((prev) => [...prev, {
+        role: 'model',
+        text: data.text,
+        timestamp: Date.now(),
+      }]);
 
     } catch (err: any) {
-      console.error("Gemini API Error:", err);
-      setError(err.message || "An error occurred while communicating with Gemini.");
+      console.error("Chat Error:", err);
+      setError(err.message || "Failed to connect to the server. Is 'node server.js' running?");
     } finally {
       setIsLoading(false);
     }
@@ -69,10 +77,11 @@ const App: React.FC = () => {
         {messages.length === 0 && !error && (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 p-8 opacity-60">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mb-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 0 1-3-3m3 3a3 3 0 1 0 0 6h13.5a3 3 0 1 0 0-6m-16.5-3a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3m-19.5 0a4.5 4.5 0 0 1 .9-2.7L5.737 5.1a3.375 3.375 0 0 1 2.7-1.35h7.126a3.375 3.375 0 0 1 2.7 1.35l3.338 6.366a4.5 4.5 0 0 1 .9 2.7" />
                 </svg>
-                <p className="text-lg font-medium">Start a conversation with Gemini</p>
-                <p className="text-sm">Type a message below to begin.</p>
+                <p className="text-lg font-medium">Node.js Server Backend</p>
+                <p className="text-sm">Your API Key is now hidden on the server.</p>
+                <p className="text-xs mt-2 text-gray-300">Try "What's the weather in Seattle?"</p>
             </div>
         )}
         
